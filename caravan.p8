@@ -586,18 +586,19 @@ function _draw()
 	cart_draw()
 	rect(0,0,127,127,5)
 	map(0,0, 0,mapy, 32,128)
-	mapy+=.25
+	--mapy+=.25
 	
-	
+	--[[
 	for obj in all(objects) do
 		spr(3, obj.x,obj.y)
 		obj.y+=.25
 		
 		if obj.y>130 then del(objects,obj) end
 	end
+	]]
 	--debug=mget(0,63)
 	
-	debug=#objects
+	--debug=#objects
 	
 	
 	if debug then print(debug, 0,110, 1) print(debug, 1,111, 7) end
