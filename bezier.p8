@@ -2,6 +2,12 @@ pico-8 cartridge // http://www.pico-8.com
 version 7
 __lua__
 ctrl_pts = {}
+
+output_file="curves.txt"
+smoothness = 10 --number of points in curve, higher is smoother
+
+
+
 function add_pt(x,y)
  p = {}
  p.x = x
@@ -39,6 +45,7 @@ function cubic_bezier(t, ws)
  )
 end
 
+--Seed control points
 add_pt(10,10)
 add_pt(120,30)
 add_pt(20,100)
@@ -47,107 +54,106 @@ add_pt(120,120)
 selected_pt = 3
 cooldown_timer = 0
 cooldown = false
+save_coords=false
 function _update()
- h = selected_pt
- -- Move the selected control point
- if(btn(0)) then ctrl_pts[h].x -= 1 end
- if(btn(1)) then ctrl_pts[h].x += 1 end
- if(btn(2)) then ctrl_pts[h].y -= 1 end
- if(btn(3)) then ctrl_pts[h].y += 1 end
+    h = selected_pt
+    -- Move the selected control point
+    if(btn(0)) then ctrl_pts[h].x -= 1 end
+    if(btn(1)) then ctrl_pts[h].x += 1 end
+    if(btn(2)) then ctrl_pts[h].y -= 1 end
+    if(btn(3)) then ctrl_pts[h].y += 1 end
 
- -- Change the selected control point
- if (btn(4) and not cooldown) then
-  selected_pt -= 1
-  cooldown = true
-		
-	if selected_pt<=0 then selected_pt=4 end
- end
+    --Z, Change the selected control point
+    if btnp(4) then
+        selected_pt+=1
+        --cooldown = true
+        
+        if selected_pt>4 then selected_pt=0 end
+    end
+    cooldown=false
 	
-if btnp(5) then
-	local foo="";
-	for i=1,#interpolated_pts do
-	  p1 = interpolated_pts[i]
-	  p2 = interpolated_pts[i+1]
-	  if (p2 != nil) then
-	   --line(p1.x, p1.y, p2.x, p2.y, 10)
-	   --pset(p1.x, p1.y,7)
-			foo=foo..p1.x..","..p1.y..";"
-	  end
-	 end
-		
-		
-	--dset(1,"hello")
-	printh(foo,"foo.txt",true);
-end
-	
- --[[
-	if (btn(5) and not cooldown) then
-  selected_pt += 1
-  cooldown = true
- end
-	]]
+    --X, Saves coords to file
+    if btnp(5) then
+        save_coords=true
+        coords_out="";
+        mst_t=30
+    end
 
- if (selected_pt > 4) then
-  selected_pt = 4
- end
- if (selected_pt < 1) then
-  selected_pt = 1
- end
 
- -- Can't change selected pt too quickly
- if (cooldown) then
-  cooldown_timer += 1
-  if (cooldown_timer == 10) then
-   cooldown = false
-   cooldown_timer = 0
-  end
- end
+
+    --if selected_pt > 4 then selected_pt=4 end
+    --if (selected_pt < 1) then selected_pt = 1 end
+    
+    --[[
+    Can't change selected pt too quickly
+    
+    if (cooldown) then
+        cooldown_timer += 1
+        if (cooldown_timer == 10) then
+        cooldown = false
+        cooldown_timer = 0
+        end
+    end
+]]
 end
 
-smoothness = 10 --number of points in curve, higher is smoother
 
-function draw_decasteljau()
- -- TODO(lito)
-end
+
 
 interpolated_pts = {}
 function draw_sampled(ws)
- interpolated_pts = {}
- step = 1/smoothness
- for i=1,smoothness+1 do
-  j = i-1
-  t = j*step
-  add(interpolated_pts, cubic_bezier(t,ws))
- end
+    interpolated_pts = {}
+    step = 1/smoothness
+    
+    for i=1,smoothness+1 do
+        j = i-1
+        t = j*step
+        add(interpolated_pts, cubic_bezier(t,ws))
+    end
+    
+    for i=1,#interpolated_pts do
+        p1 = interpolated_pts[i]
+        p2 = interpolated_pts[i+1]
+        
+        if (p2 != nil) then
+            --line(p1.x, p1.y, p2.x, p2.y, 10)
+            pset(p1.x, p1.y,7) --draw dot at each point
+            
+            if save_coords then
+                coords_out=coords_out..p1.x..","..p1.y..";"
+            end
+        end
+    end
 
- for i=1,#interpolated_pts do
-  p1 = interpolated_pts[i]
-  p2 = interpolated_pts[i+1]
-  if (p2 != nil) then
-   --line(p1.x, p1.y, p2.x, p2.y, 10)
-   pset(p1.x, p1.y,7) --draw point
-  end
- end
+    if save_coords then
+        printh(coords_out,output_file,true);
+        save_coords=false
+    end
 end
 
-
-
-
-cartdata("curves")
-dset(1,"")
+msg_t=0
 
 function _draw()
  cls()
 
- draw_sampled(ctrl_pts)
+ draw_sampled(ctrl_pts) --curve points
 
- for p in all(ctrl_pts) do
-  pset(p.x, p.y, 12)
- end
+ for p in all(ctrl_pts) do pset(p.x, p.y, 12) end --control points
+ 
  active = ctrl_pts[selected_pt]
- pset(active.x, active.y, 10)
-	print(active.x..","..active.y, 0,0,5)
+ 
+	print(active.x..","..active.y, 0,60,5)
+	pset(active.x, active.y, 10)
+	circ(active.x, active.y, 3, 7)
 	
+    --save message
+	if msg_t>0 then
+	    rectfill(30,50, 130,65, 3)
+	    print("saved to "..output_file, 32,52, 7)
+	    mst_t-=1
+	end
+	
+	--screen frame
 	rect(0,0,127,127,5)
 end
 __gfx__

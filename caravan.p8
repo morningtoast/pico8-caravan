@@ -76,7 +76,7 @@ function p_move()
 	end
 	
 	p_muzzle_x=p_x+8
-		p_muzzle_y=p_y
+	p_muzzle_y=p_y
 end
 
 function p_action()
@@ -170,10 +170,36 @@ end
 
 
 
+function parse_curve(coordstr, speed)
+	local speed=speed or 1
+	local paths={}
+	local route_pairs=split(coordstr,";")
+
+	for n=1,count do
+		local this_point=split(route_pairs[n]..",",",")
+		local next_pos=n+1
+
+		if next_pos<=#route_pairs then
+			local next_point=split(route_pairs[next_pos]..",",",")
+			
+			local pt_ang = atan2(next_point[1]-this_point[1], next_point[2]-this_point[2])
+			local pt_dist=distance(this_point[1],this_point[2], next_point[1],next_point[2])
+			
+			add(paths, {ang=pt_ang, dist=pt_dist, sp=speed})
+		end
+	end
+
+	return paths
+	
+end
+
 
 
 -- #pathing
 -- Defines routes for a pattern
+route_stairstep=parse_curve("10,7;24.565,40.24;38.223,64.991;50.916,81.289;62.566,89.153;73.118,88.626;82.494,79.722;90.637,62.482;97.479,36.939;102.954,3.113;",2)
+
+
 function rp_stutter(dir)
 	--local dir=dir or .5
 	local paths={}
@@ -183,11 +209,11 @@ function rp_stutter(dir)
 	
 
 	
-	route_pairs=split(flat,";")
+	local route_pairs=split(flat,";")
 	
 	
 	--local origin=split(route_pairs[1],",")
-	local count=#route_pairs
+	--local count=
 	
 	--this_point=split(route_pairs[1]..",",",")
 	--next_point=split(route_pairs[2]..",",",")
@@ -195,16 +221,14 @@ function rp_stutter(dir)
 	--debug=atan2(next_point[1]-this_point[1], next_point[2]-this_point[2])
 
 	for n=1,count do
-		this_point=split(route_pairs[n]..",",",")
-		
+		local this_point=split(route_pairs[n]..",",",")
 		local next_pos=n+1
 
-		if next_pos<=count then
-			next_point=split(route_pairs[next_pos]..",",",")
+		if next_pos<=#route_pairs then
+			local next_point=split(route_pairs[next_pos]..",",",")
 			
-			pt_ang = atan2(next_point[1]-this_point[1], next_point[2]-this_point[2])
-			
-			pt_dist=distance(this_point[1],this_point[2], next_point[1],next_point[2])
+			local pt_ang = atan2(next_point[1]-this_point[1], next_point[2]-this_point[2])
+			local pt_dist=distance(this_point[1],this_point[2], next_point[1],next_point[2])
 			
 			add(paths, {ang=pt_ang, dist=pt_dist, sp=1})
 		end
@@ -230,11 +254,18 @@ enemy_type_popcorn={
 	
 }
 
+mobshoot={
+	when=60,
+	action=function(self)
+		bullet_generate(self.x,self.y, .75)	
+	end
+}
 
--- wave_find(rp_stutter(), enemy_type_popcorn, originX,originY, bullet_style, customConfig)
+
+-- wave_bind(rp_stutter(), enemy_type_popcorn, originX,originY, customConfig)
 mobs={}
-function wave_bind(route_paths, enemy_obj, ox,oy, shot_obj, custom)
-	local config={spawn=0,qty=1,chgx=0,chgy=0} -- spawn=frametime between spawns, qty=number of mobs, chgx/chgy=change in x/y between spawns, 
+function wave_bind(route_paths, enemy_obj, ox,oy, custom)
+	local config={qty=1,spawn=0,chgx=0,chgy=0,shoot=false} -- qty=number of mobs, spawn=frametime between spawns, chgx/chgy=change in x/y between spawns, shoot=shot config
 	
 	if custom then
 		for k,v in pairs(custom) do config[k]=v end
@@ -247,12 +278,14 @@ function wave_bind(route_paths, enemy_obj, ox,oy, shot_obj, custom)
 			routes=route_paths,
 			route_pos=1,
 			route_last=99,
-			route_t=0,
+			shoot=false,
 			spawn=config.spawn*n,
 			x=ox+config.chgx*n,
 			y=oy+config.chgy*n,
 			active=false
 		}
+		
+		if config.shoot then obj.shoot=config.shoot end
 
 		add(mobs, obj)
 	end
@@ -262,11 +295,12 @@ end
 
 function mob_update()
 	for m in all(mobs) do
-		debug=m.route_pos
+		--activate mob when it first enters screen, can start offscreen
+		if not offscreen(m.x,m.y) and not m.active then m.active=true end
 		
+
 		if m.route_pos!=m.route_last then
 			local thisRoutePath=m.routes[m.route_pos]
-			m.route_t=0
 			
 			if thisRoutePath.wait then
 				m.wait=thisRoutePath.wait
@@ -277,33 +311,49 @@ function mob_update()
 			
 			m.route_last=m.route_pos
 		end
-		--else
-			
-			if m.wait then
-				if m.wait<=0 then
-					m.route_pos+=1
-					m.wait=false
-				else
-					m.wait-=1
-				end
+
+		if m.wait then
+			if m.wait<=0 then
+				m.route_pos+=1
+				m.wait=false
 			else
+				m.wait-=1
+			end
+		else
+			if m.route_pos>0 then
 				if distance(m.x,m.y, m.dest_x,m.dest_y)>1.5 then
 					m.x+=m.dx
 					m.y+=m.dy
 				else
 					m.route_pos+=1
 				end
+			else
+				--this keeps object moving in direction of last point	
+				m.x+=m.dx
+				m.y+=m.dy
 			end
-		--end
+		end
+
+		if m.route_pos>#m.routes then m.route_pos=-1 end
 		
-		if m.route_pos>#m.routes then m.route_pos-=1 end
+		--remove mob when offscreen
+		if offscreen(m.x,m.y) and m.active then 
+			del(mobs, m)
+		end
 		
-		m.route_t+=1
+		if m.active then 
+			if m.shoot then
+				if m.t>m.shoot.when then
+					m.action(m)	
+				end
+			end
+			
+			
+			m.t+=1 
+		end
 	end
 	
 end
-
-
 
 
 
@@ -313,7 +363,6 @@ function mob_draw()
         print("\130",m.x,m.y, 8)
 		pset(m.x,m.y,10)
     end
-	
 end
 
 
@@ -329,14 +378,11 @@ shotgun={qty=3, accuracy=.0625}
 
 function shot_generate(ox,oy, angle, attrs)
 	attrs=attrs or {}
-	local config={qty=1,speed=2,spread=0,chgdir=0,size=3,accuracy=0,targetplayer=false}
+	local config={qty=1,speed=2,spread=0,chgdir=0,size=3,accuracy=0}
     local list={}
 	
 	for k,v in pairs(attrs) do config[k]=v end
-	
-	if targetplayer then
-		angle = atan2(p_x-ox, p_y-oy) --gets position of specific target
-	end
+
 	
 	if config.spread>0 then
 		local perside=flr(config.qty/2)
