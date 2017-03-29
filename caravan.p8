@@ -182,7 +182,7 @@ function bullet_update()
 		b.y+=b.dy
 		
 		
-		debug=flr(b.y)
+		debug=fget(mget(b.x/8,b.y-mapy/8),1)
 		
 		if offscreen(b.x,b.y) then
 			del(bullets,b)
@@ -229,6 +229,14 @@ end
 -- defines routes for a pattern
 route_stairstep=parse_curve("10,7;24.565,40.24;38.223,64.991;50.916,81.289;62.566,89.153;73.118,88.626;82.494,79.722;90.637,62.482;97.479,36.939;102.954,3.113;",2)
 
+
+function rp_custompath()
+	local paths={}
+	add(paths, {ang=.5, dist=64, sp=3})
+	add(paths, {wait=30})
+	add(paths, {ang=.75, dist=100, sp=3})
+	return paths
+end
 
 function rp_stutter(dir)
 
@@ -549,7 +557,7 @@ end
 function _init()
 	score_reset()
 	title_init()
-	
+	--[[
 	objects={}
 	for mx=0,15 do
 		for my=0,63 do
@@ -557,7 +565,7 @@ function _init()
 				add(objects,{x=mx*8,y=my*8-384})
 			end
 		end
-	end
+	end]]
 end
 
 function _update60()
@@ -586,7 +594,7 @@ function _draw()
 	cart_draw()
 	rect(0,0,127,127,5)
 	map(0,0, 0,mapy, 32,128)
-	--mapy+=.25
+	mapy+=.25
 	
 	--[[
 	for obj in all(objects) do
